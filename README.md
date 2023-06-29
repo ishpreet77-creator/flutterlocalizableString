@@ -17,7 +17,6 @@ en.json For English
   "country": "Country"
 }
 ```
-
 es.json For Spanish
 ```json
 {
@@ -26,7 +25,6 @@ es.json For Spanish
   "country": "País"
 }
 ```
-
 fr.json For French
 ```json
 {
@@ -35,109 +33,156 @@ fr.json For French
   "country": "Pays"
 }
 ```
-
 ## Set Json Files Paths in pubspec file
 ```yaml
-assets:
-  - language/en.json
-  - language/es.json
-  - language/fr.json
+ assets:
+    - assets/messages_en.json
+    - assets/messages_es.json
+    - assets/messages_fr.json
 ```
 
 ## Create Classes For Localization
 ```dart
-import 'dart:async';
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutterlocalizationsample/application_localizations_delegate.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
-class ApplicationLocalizations {
-  final Locale appLocale;
+class AppLocalizations {
+  final Locale locale;
+  static Map<String, dynamic>? _localizedStrings;
 
-  ApplicationLocalizations(this.appLocale);
+  AppLocalizations(this.locale);
 
-  static ApplicationLocalizations of(BuildContext context) {
-    return Localizations.of<ApplicationLocalizations>(context, ApplicationLocalizations);
+  static AppLocalizations? of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
-
-  static const LocalizationsDelegate<ApplicationLocalizations> delegate =
-  ApplicationLocalizationsDelegate();
-
-  Map<String, String> _localizedStrings;
 
   Future<bool> load() async {
-    // Load JSON file from the "language" folder
-    String jsonString =
-    await rootBundle.loadString('assets/language/${appLocale.languageCode}.json');
-    Map<String, dynamic> jsonLanguageMap = json.decode(jsonString);
-    _localizedStrings = jsonLanguageMap.map((key, value) {
-      return MapEntry(key, value.toString());
+    
+    final defaultLanguage = 'en'; // Set English as the default language
+
+    final jsonString = await rootBundle.loadString('assets/messages_${locale.languageCode}.json').catchError((error) {
+      // If the selected language is not supported, load the default language (English)
+      return rootBundle.loadString('assets/messages_$defaultLanguage.json');
     });
-    return true;
+
+    // ignore: unnecessary_null_comparison
+    if (jsonString != null) {
+      _localizedStrings = json.decode(jsonString);
+      return true;
+    } else {
+      // If the asset file couldn't be loaded, set an empty map to avoid null errors
+      _localizedStrings = {};
+      return false;
+    }
   }
 
-  // called from every widget which needs a localized text
-  String translate(String jsonkey) {
-    return _localizedStrings[jsonkey];
+  String translate(String key) {
+    final translation = _localizedStrings![key];
+
+    if (translation != null) {
+      return translation;
+    } else {
+      // If the translation value is null, fallback to English translation
+      final defaultTranslation = _localizedStrings!['en']?[key];
+      return defaultTranslation ?? '';
+    }
   }
 }
+
+
 ```
 
 ```dart
-import 'package:flutter/material.dart';
-import 'package:flutterlocalizationsample/application_localizations.dart';
+import 'package:flutter/cupertino.dart';
+import 'application_localizations.dart';
 
-class ApplicationLocalizationsDelegate extends LocalizationsDelegate<ApplicationLocalizations> {
-  // This delegate instance will never change (it doesn't even have fields!)
-  // It can provide a constant constructor.
-  const ApplicationLocalizationsDelegate();
+class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+  const AppLocalizationsDelegate();
 
   @override
   bool isSupported(Locale locale) {
-    // Include all of your supported language codes here
-    return ['en', 'es', 'fr'].contains(locale.languageCode);
+    return [
+      'en',
+      'fr',
+      'es'
+    ].contains(locale.languageCode);
   }
 
   @override
-  Future<ApplicationLocalizations> load(Locale locale) async {
-    // AppLocalizations class is where the JSON loading actually runs
-    ApplicationLocalizations localizations = new ApplicationLocalizations(locale);
+  Future<AppLocalizations> load(Locale locale) async {
+    AppLocalizations localizations = AppLocalizations(locale);
     await localizations.load();
     return localizations;
   }
 
   @override
-  bool shouldReload(ApplicationLocalizationsDelegate old) => false;
+  bool shouldReload(AppLocalizationsDelegate old) => false;
 }
+
 ```
 
 ## Integrate Localization in main.dart file
 ```dart
-      supportedLocales: [
-        Locale( 'en' , 'US' ),
-        Locale( 'es' , 'ES' ),
-        Locale( 'fr' , 'FR' ),
-      ],
 
+void main() {
+  runApp(MyApp());
+}
+class MyApp extends StatelessWidget {
+  // This widget is the root of your application.
+  @override
+  Widget build(BuildContext context) {
+   
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Flutter Demo',
       localizationsDelegates: [
-        ApplicationLocalizations.delegate,
+        AppLocalizationsDelegate(),
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
+      supportedLocales: [
+        const Locale('en'),
+        const Locale('fr'),
+        const Locale('es'),
+      ],
+      home: Home(),
+    );
+  }
+}
 
-      localeResolutionCallback: (locale, supportedLocales) {
-        for (var supportedLocaleLanguage in supportedLocales) {
-          if (supportedLocaleLanguage.languageCode == locale.languageCode &&
-              supportedLocaleLanguage.countryCode == locale.countryCode) {
-            return supportedLocaleLanguage;
-          }
-        }
-        return supportedLocales.first;
-      },
 ```
 
-## Display Localized Text
+## set  string on the variable
 ```dart
-Text(ApplicationLocalizations.of(context).translate("player_name"));
+import 'package:flutter/cupertino.dart';
+import 'application_localizations.dart';
+
+class TranslatedStrings {
+  static String playerName = '';
+  static String clubName = '';
+ 
+
+  static void loadTranslations(BuildContext context) async {
+    final appLocalizations = AppLocalizations.of(context);
+
+    if (appLocalizations != null) {
+      playerName = appLocalizations.translate("player_name") ?? '';
+      clubName = appLocalizations.translate("club_name") ?? '';
+      
+    }
+  }
+}
 ```
+## set varivale on the screen
+
+ Text(TranslatedStrings.playerName) 
+
+ //also call the function before translating the value
+ 
+ TranslatedStrings.loadTranslations(context);
+
+ 
+
+
